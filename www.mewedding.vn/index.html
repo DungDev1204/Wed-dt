@@ -10373,7 +10373,145 @@
   </div>
 
 
+<script>
+(function () {
+  // URL Web App (đúng project chứa doGet/doPost bạn gửi)
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxhQ_gIUpJUPX5JLAgIrMOOMvZeAr4qSvLV5Usav0XsvoNDvrbj7VmHpgxx-OxlOLk/exec';
 
+  // Helpers
+  var qs  = function (root, sel) { return (root || document).querySelector(sel); };
+  var qsa = function (root, sel) { return Array.from((root || document).querySelectorAll(sel)); };
+
+  function openThanks(id){
+    if (window.showPopup) return window.showPopup(id);
+    if (window.openPopupById) return window.openPopupById(id);
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'block';
+  }
+
+  // Gửi GET tới Apps Script (tránh CORS/preflight)
+  function sendToSheet(paramsObj){
+    var p = new URLSearchParams(paramsObj);
+    p.set('ts', Date.now().toString()); // tránh cache
+    return fetch(SCRIPT_URL + '?' + p.toString(), { method: 'GET', mode: 'cors', cache: 'no-store' })
+      .then(function(r){ return r.text(); })
+      .then(function(t){ try { return JSON.parse(t); } catch(_) { return { ok:false }; } })
+      .catch(function(){ return { ok:false }; });
+  }
+
+  // ===== FORM LỜI CHÚC (ví dụ khu vực #FORM7) =====
+  function wireWish(){
+    var form = qs(document, '#FORM7 form') || qs(document, '#FORM7');
+    if (!form) return;
+
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+
+      // Tên
+      var name  = (qs(form, 'input[name="name"], input[placeholder*="Tên"], input[placeholder*="Họ"]') || {}).value || '';
+      // SĐT (nếu form này có)
+      var phone = (qs(form, 'input[name="phone"], input[type="tel"]') || {}).value || '';
+      // Lời chúc nhập tay
+      var messageEl = qs(form, 'textarea, [contenteditable="true"]');
+      var message = messageEl ? (messageEl.value || messageEl.textContent || '') : '';
+
+      // Gợi ý lời chúc (select)
+      var selPreset = qs(form, 'select');
+      var wishPresetText = '', wishPresetValue = '';
+      if (selPreset){
+        var opt = selPreset.options[selPreset.selectedIndex];
+        wishPresetText  = opt && opt.text ? opt.text.trim() : '';
+        wishPresetValue = (selPreset.value || '').trim();
+      }
+
+      // Nhóm (Bạn Cô Dâu / Chú Rể) nếu có select riêng
+      var groupSel = qs(form, 'select[name="group"], select[data-name="group"]');
+      var group = groupSel ? (groupSel.value || '').trim() : '';
+
+      var payload = {
+        kind: 'wish',
+        name: (name||'').trim(),
+        phone: (phone||'').trim(),
+        message: (message||'').trim(),
+        wishPresetText: wishPresetText,
+        wishPresetValue: wishPresetValue,
+        group: group
+      };
+
+      sendToSheet(payload).then(function(res){
+        if (res && res.ok) {
+          openThanks('Thanks-LC');   // mở popup cảm ơn có sẵn của bạn
+          // form.reset();            // nếu muốn reset thì bỏ comment
+        } else {
+          alert('Gửi lời chúc không thành công, vui lòng thử lại!');
+        }
+      });
+    }, { capture:true });
+  }
+
+  // ===== FORM XÁC NHẬN THAM DỰ (ví dụ khu vực #FORM8) =====
+  function wireRSVP(){
+    var form = qs(document, '#FORM8 form') || qs(document, '#FORM8');
+    if (!form) return;
+
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+
+      var name  = (qs(form, 'input[name="name"], input[placeholder*="Tên"]') || {}).value || '';
+      var phone = (qs(form, 'input[name="phone"], input[type="tel"]') || {}).value || '';
+      var message = (qs(form, 'textarea') || {}).value || '';
+
+      // Tham dự? (ưu tiên radio Có/Không; nếu không có thì thử select)
+      var attend = '';
+      var picked = qs(form, 'input[type="radio"]:checked');
+      if (picked) {
+        attend = (picked.value || '').trim();
+        if (!attend) {
+          var lb = picked.closest('label') || picked.nextElementSibling;
+          if (lb) attend = (lb.textContent || '').trim();
+        }
+      } else {
+        var selAttend = qs(form, 'select[name*="attend"], select[name*="tham"], #FORM_ITEM5 select');
+        if (selAttend) {
+          var opt = selAttend.options[selAttend.selectedIndex];
+          attend = (opt && opt.text ? opt.text : selAttend.value || '').trim();
+        }
+      }
+
+      // Số người (select)
+      var guestsSel = qs(form, 'select[name*="guest"], select[name*="so_nguoi"], #FORM_ITEM7 select');
+      var guests = guestsSel ? (guestsSel.value || '').trim() : '';
+
+      var payload = {
+        kind: 'rsvp',
+        name: (name||'').trim(),
+        phone: (phone||'').trim(),
+        attend: attend,
+        guests: guests,
+        message: (message||'').trim()
+      };
+
+      sendToSheet(payload).then(function(res){
+        if (res && res.ok) {
+          openThanks('Thanks-XNTD'); // mở popup cảm ơn có sẵn của bạn
+           form.reset();
+        } else {
+          alert('Gửi phản hồi không thành công, vui lòng thử lại!');
+        }
+      });
+    }, { capture:true });
+  }
+
+  // Khởi tạo
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){
+      wireWish(); wireRSVP();
+    }, { once:true });
+  } else {
+    wireWish(); wireRSVP();
+  }
+})();
+</script>
 
 </body>
 
